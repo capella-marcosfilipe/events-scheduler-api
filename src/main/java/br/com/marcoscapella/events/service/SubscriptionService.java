@@ -1,5 +1,7 @@
 package br.com.marcoscapella.events.service;
 
+import br.com.marcoscapella.events.dto.SubscriptionRankingByUser;
+import br.com.marcoscapella.events.dto.SubscriptionRankingItem;
 import br.com.marcoscapella.events.dto.SubscriptionResponse;
 import br.com.marcoscapella.events.exception.EventNotFoundException;
 import br.com.marcoscapella.events.exception.SubscriptionConflictException;
@@ -12,6 +14,10 @@ import br.com.marcoscapella.events.repository.SubscriptionRepo;
 import br.com.marcoscapella.events.repository.UserRepo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 @Service
 public class SubscriptionService {
@@ -58,5 +64,25 @@ public class SubscriptionService {
 
         Subscription res = subRepo.save(subs);
         return new SubscriptionResponse(res.getSubscriptionNumber(), "http://codecraft.com/subscription/" + res.getEvent().getPrettyName() + "/" + res.getSubscriber().getId());
+    }
+
+    public List<SubscriptionRankingItem> getCompleteRanking(String prettyName) {
+        Event evt = evtRepo.findByPrettyName(prettyName);
+        if (evt == null) {
+            throw new EventNotFoundException("Ranking " + prettyName + " do Evento não existe");}
+        return subRepo.generateRanking(evt.getEventId());
+    }
+
+    public SubscriptionRankingByUser getRankingByUser(Integer userId, String prettyName) {
+        List<SubscriptionRankingItem> ranking = getCompleteRanking(prettyName);
+
+        SubscriptionRankingItem item = ranking.stream().filter(i->i.userId().equals(userId)).findFirst().orElse(null);
+
+        if (item == null) {
+            throw new UserIndicatorNotFoundException("Não há inscrições com indicação do usuário " + userId);
+        }
+        Integer position = IntStream.range(0, ranking.size()).filter(pos -> ranking.get(pos).userId().equals(userId)).findFirst().getAsInt();
+
+        return new SubscriptionRankingByUser(item, position);
     }
 }
